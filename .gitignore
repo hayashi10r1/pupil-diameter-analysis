@@ -1,0 +1,19 @@
+# MATLAB editor backups and autosave files
+*.asv
+*.autosave
+
+# MATLAB session and generated figure files
+*.fig
+
+# Experimental recordings and exported pupil data
+*.mat
+*.csv
+data/
+
+# Generated pupil-plot folders
+*_pupil_windows/
+
+# Operating system files
+Thumbs.db
+Desktop.ini
+.DS_Store
