@@ -115,10 +115,10 @@ plot_pupil_timeseries
 
 ### 色ごとの瞳孔径グラフ
 
-`plot_pupil_windows_by_colour` は、各色について刺激開始の前30秒と後40秒を切り出し、両眼の有効な瞳孔径の平均を0.5秒移動平均でPNG出力します。時刻の対応には、`tobiiSystemOnsetUS`を優先して使います。
+`plot_pupil_windows_by_color` は、各色について刺激開始の前30秒と後40秒を切り出し、両眼の有効な瞳孔径の平均を0.5秒移動平均でPNG出力します。時刻の対応には、`tobiiSystemOnsetUS`を優先して使います。
 
 ```matlab
-plot_pupil_windows_by_colour
+plot_pupil_windows_by_color
 ```
 
 この解析ファイル内の`darkAdaptationSeconds`と`stimulusSeconds`は、実験側の黒画面・色刺激の秒数と一致させてください。
@@ -130,6 +130,16 @@ plot_pupil_windows_by_colour
 ```matlab
 export_pupil_diameter
 ```
+
+### 刺激RGBと輝度の書き出し
+
+`export_stimulus_luminance` は、実験MATファイルの実際の提示順と、SpecbosのLUTに保存された`iRGB`・`Luminance`を完全一致で照合します。試行番号、RGBデジット値、輝度（cd/m²）を`*_stimulus_luminance.csv`として保存します。
+
+```matlab
+export_stimulus_luminance
+```
+
+最初に実験データMATファイルを選びます。プロジェクト直下にSpecbosの`SpecbosData-*.mat`が1つだけある場合は、それを自動で使用します。
 
 ## 解析時の注意
 

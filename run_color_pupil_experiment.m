@@ -1,5 +1,5 @@
 function run_color_pupil_experiment
-% RUN_COLOR_PUPIL_EXPERIMENT Present full-screen colour stimuli while recording
+% RUN_COLOR_PUPIL_EXPERIMENT Present full-screen color stimuli while recording
 % pupil data with a Tobii Pro Nano.
 %
 % Set cfg.mode to 'test' to run the display without a tracker.
@@ -24,7 +24,7 @@ oldVerbosity = Screen('Preference', 'Verbosity', 2);
 oldSkipSyncTests = Screen('Preference', 'SkipSyncTests', double(cfg.skipSyncTests));
 cleanupObj = onCleanup(@() cleanupExperiment(oldVerbosity, oldSkipSyncTests)); %#ok<NASGU>
 if cfg.skipSyncTests
-    warning('ColourPupilExperiment:UnsyncedPresentation', ...
+    warning('ColorPupilExperiment:UnsyncedPresentation', ...
         ['Psychtoolbox synchronization tests are skipped. Stimulus onset ', ...
          'times are not guaranteed; do not interpret them as precise timing.']);
 end
@@ -35,16 +35,16 @@ try
     % some Windows systems, SDK discovery running first can perturb it.
     screens = Screen('Screens');
     if ~ismember(cfg.screenNumber, screens)
-        error('ColourPupilExperiment:DisplayNotFound', ...
+        error('ColorPupilExperiment:DisplayNotFound', ...
             'Psychtoolbox screen %d was requested, but available screen numbers are: [%s].', ...
             cfg.screenNumber, num2str(screens));
     end
     screenNumber = cfg.screenNumber;
     fprintf('Psychtoolbox screens: [%s]. Stimulus screen: %d.\n', num2str(screens), screenNumber);
-    % Keep Psychtoolbox's native 0--255 colour range: cfg.stimuliRGB
+    % Keep Psychtoolbox's native 0--255 color range: cfg.stimuliRGB
     % values are specified in standard 8-bit notation.
     PsychDefaultSetup(1);
-    % No imaging-pipeline tasks are needed for simple full-screen colours.
+    % No imaging-pipeline tasks are needed for simple full-screen colors.
     % Screen('OpenWindow') also avoids stale PsychImaging configuration left
     % behind by an earlier aborted startup.
     [window, windowRect] = Screen('OpenWindow', screenNumber, cfg.backgroundRGB);
@@ -80,18 +80,18 @@ try
     end
     WaitSecs(cfg.preRunFixationSeconds);
 
-    % One trial consists of a colour screen followed by a black screen.
+    % One trial consists of a color screen followed by a black screen.
     % 1試行（1セット）は、色刺激40秒の後に黒画面30秒を提示します。
     trialOrder = randperm(size(cfg.stimuliRGB, 1));
-    trialLog = repmat(struct('trial', [], 'colourRGB', [], ...
+    trialLog = repmat(struct('trial', [], 'colorRGB', [], ...
         'stimulusOnsetPTB', [], 'stimulusOffsetPTB', [], ...
         'tobiiSystemOnsetUS', [], 'tobiiSystemOffsetUS', []), ...
         1, numel(trialOrder));
 
     for iTrial = 1:numel(trialOrder)
-        colour = cfg.stimuliRGB(trialOrder(iTrial), :);
+        color = cfg.stimuliRGB(trialOrder(iTrial), :);
 
-        Screen('FillRect', window, colour, windowRect);
+        Screen('FillRect', window, color, windowRect);
         onset = Screen('Flip', window);
         % `onset` is the Psychtoolbox visual-onset timestamp. Take a
         % Tobii-system-clock marker immediately afterwards so that this
@@ -113,7 +113,7 @@ try
         if strcmp(cfg.mode, 'production')
             tobiiSystemOffsetUS = double(tobiiOperations.get_system_time_stamp());
         end
-        trialLog(iTrial) = struct('trial', iTrial, 'colourRGB', colour, ...
+        trialLog(iTrial) = struct('trial', iTrial, 'colorRGB', color, ...
             'stimulusOnsetPTB', onset, 'stimulusOffsetPTB', offset, ...
             'tobiiSystemOnsetUS', tobiiSystemOnsetUS, ...
             'tobiiSystemOffsetUS', tobiiSystemOffsetUS);
@@ -169,7 +169,7 @@ if ~isempty(cfg.sdkRoot)
     addpath(genpath(char(cfg.sdkRoot)));
 end
 if exist('EyeTrackingOperations', 'class') ~= 8
-    error('ColourPupilExperiment:SDKUnavailable', ...
+    error('ColorPupilExperiment:SDKUnavailable', ...
         ['Production mode requires the Tobii Pro SDK MATLAB Binding. ', ...
          'Add its folder to the MATLAB path before running this experiment.']);
 end
@@ -177,12 +177,12 @@ try
     operations = EyeTrackingOperations();
     trackers = operations.find_all_eyetrackers();
 catch exception
-    error('ColourPupilExperiment:SDKConnectionFailed', ...
+    error('ColorPupilExperiment:SDKConnectionFailed', ...
         'Could not search for Tobii eye trackers.\n\n%s', exception.message);
 end
 
 if isempty(trackers)
-    error('ColourPupilExperiment:TrackerNotConnected', ...
+    error('ColorPupilExperiment:TrackerNotConnected', ...
         ['Production mode stopped: no Tobii eye tracker was found. ', ...
          'Check Tobii Pro Eye Tracker Manager and the USB/network connection.']);
 end
@@ -190,7 +190,7 @@ end
 models = arrayfun(@(tracker) string(tracker.Model), trackers);
 matching = find(strcmpi(models, cfg.trackerModel));
 if numel(matching) ~= 1
-    error('ColourPupilExperiment:WrongTracker', ...
+    error('ColorPupilExperiment:WrongTracker', ...
         'Expected exactly one %s, but found: %s.', cfg.trackerModel, strjoin(models, ', '));
 end
 eyeTracker = trackers(matching);
@@ -264,7 +264,7 @@ cfg.skipSyncTests = true;                   % Allows presentation without timing
 cfg.sdkRoot = '';                            % Optional SDK folder, e.g. 'C:\tools\TobiiProSDK'.
 cfg.trackerModel = 'Tobii Pro Nano';
 cfg.samplingFrequencyHz = 60;               % Nano's nominal sample rate.
-% Edit this list to change the stimuli. Each row is one [R G B] colour.
+% Edit this list to change the stimuli. Each row is one [R G B] color.
 % RGB values range from 0 to 255. Add a row to add a stimulus.
 cfg.stimuliRGB = [
      51   0   0;
@@ -288,7 +288,7 @@ cfg.stimuliRGB = [
     204 204 204;  
     255 255 255;
 ];
-cfg.stimulusSeconds = 40.0;                 % Colour stimulus duration: 40 s.（色刺激：40秒）
+cfg.stimulusSeconds = 40.0;                 % Color stimulus duration: 40 s.（色刺激：40秒）
 cfg.interTrialSeconds = 30.0;               % Black screen duration: 30 s.（黒画面：30秒）
 cfg.preRunFixationSeconds = 30.0;           % Initial dark-adaptation period.
 cfg.backgroundRGB = [0 0 0];                % Inter-trial background (black).
@@ -331,7 +331,7 @@ while true
     end
     if firstPress(escapeKeyCode) > 0
 
-        error('ColourPupilExperiment:Aborted', 'Experiment aborted by user.');
+        error('ColorPupilExperiment:Aborted', 'Experiment aborted by user.');
     end
     if any(firstPress(allowedKeyCodes) > 0)
         return;
@@ -345,7 +345,7 @@ escapeKeyCode = KbName('ESCAPE');
 while GetSecs < endTime
     [keyIsDown, ~, keyCode] = KbCheck(-1);
     if keyIsDown && keyCode(escapeKeyCode)
-        error('ColourPupilExperiment:Aborted', 'Experiment aborted by user.');
+        error('ColorPupilExperiment:Aborted', 'Experiment aborted by user.');
     end
     WaitSecs(0.005);
 end
@@ -359,8 +359,8 @@ catch
 end
 end
 
-function drawCenteredText(window, message, colour)
-DrawFormattedText(window, message, 'center', 'center', colour);
+function drawCenteredText(window, message, color)
+DrawFormattedText(window, message, 'center', 'center', color);
 end
 
 function cleanupExperiment(oldVerbosity, oldSkipSyncTests)
