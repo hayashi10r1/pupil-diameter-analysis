@@ -4,6 +4,7 @@
 
 # MATLAB session and generated figure files
 *.fig
+*.png
 
 # Experimental recordings and exported pupil data
 *.mat
