@@ -37,7 +37,7 @@ for iSession = 1:analysis.sessionCount
     loadedData = load(sessionFiles{iSession}, 'gazeData', 'trialLog', 'metadata', 'cfg');
     validateExperimentData(loadedData, sessionFiles{iSession});
     sessionResults{iSession} = analyzeFullSession(loadedData, iSession, analysis);
-    saveFullSessionScalogram(sessionResults{iSession}, outputDirectory);
+    saveFullSessionScalogram(sessionResults{iSession}, outputDirectory, analysis);
 end
 
 waveletResults = struct( ...
@@ -53,8 +53,9 @@ end
 function analysis = defaultAnalysisConfig()
 % Change these values when a different frequency band is required.
 analysis.sessionCount = 3;
-analysis.frequencyLimitsHz = [0.1 4.0];
+analysis.frequencyLimitsHz = [0.1 10.0];
 analysis.warnMissingFraction = 0.20;
+analysis.showFigures = true;
 end
 
 function result = analyzeFullSession(loadedData, sessionNumber, analysis)
@@ -70,53 +71,65 @@ if missingFraction > analysis.warnMissingFraction
         sessionNumber, missingFraction * 100);
 end
 
-sessionMean = mean(resampledPupil, 'omitnan');
-sessionSD = std(resampledPupil, 'omitnan');
-assert(isfinite(sessionMean) && isfinite(sessionSD) && sessionSD > 0, ...
-    'Session %d has no usable pupil variation.', sessionNumber);
-
-% Normalize using the full session because individual stimulus windows are
-% not separated in this analysis.
-% 刺激ごとに区切らないため、セッション全体を基準にZ得点化します。
-normalizedPupil = (resampledPupil - sessionMean) ./ sessionSD;
-[coefficients, frequencyHz] = cwt(normalizedPupil, sampleRateHz, 'amor', ...
+% Use the interpolated pupil diameter in mm without z-scoring.
+% Z得点化せず、補間後の瞳孔径（mm）をそのままCWTへ渡します。
+[coefficients, frequencyHz] = cwt(resampledPupil, sampleRateHz, 'amor', ...
     'FrequencyLimits', analysis.frequencyLimitsHz);
+stimulusMarkers = getStimulusMarkers(loadedData, firstTimestampUS);
 
 result = struct( ...
     'session', sessionNumber, ...
     'timeSeconds', timeSeconds, ...
     'frequencyHz', frequencyHz(:), ...
+    'frequencyLimitsHz', analysis.frequencyLimitsHz, ...
     'power', abs(coefficients) .^ 2, ...
+    'powerUnit', 'mm^2 (approximately)', ...
     'missingFraction', missingFraction, ...
     'sampleRateHz', sampleRateHz, ...
-    'stimulusOnsetMinutes', getStimulusOnsetMinutes( ...
-        loadedData, firstTimestampUS));
+    'stimulusOnsetMinutes', reshape([stimulusMarkers.onsetMinutes], [], 1), ...
+    'stimulusMarkers', stimulusMarkers);
 end
 
-function saveFullSessionScalogram(result, outputDirectory)
-figureHandle = figure('Color', 'w', 'Visible', 'off', ...
+function saveFullSessionScalogram(result, outputDirectory, analysis)
+if analysis.showFigures
+    visibility = 'on';
+else
+    visibility = 'off';
+end
+figureHandle = figure('Color', 'w', 'Visible', visibility, ...
     'Position', [100 100 1600 700]);
 imagesc(result.timeSeconds ./ 60, result.frequencyHz, result.power);
 axis xy;
 set(gca, 'YScale', 'log');
+ylim(result.frequencyLimitsHz);
 hold on;
 
-% Thin white lines indicate color-stimulus onsets for visual reference.
-% 白線は色刺激の提示開始時刻です。CWT自体は全区間に対して行います。
-for onsetMinute = result.stimulusOnsetMinutes(:)'
-    xline(onsetMinute, ':w', 'LineWidth', 0.6);
+% Solid white lines are stimulus onsets; dashed lines are offsets.
+% 白い実線は刺激オン、白い破線は刺激オフです。CWT自体は全区間に対して行います。
+for marker = result.stimulusMarkers
+    xline(marker.onsetMinutes, '-', 'Color', 'w', 'LineWidth', 1.2);
+    if isfinite(marker.offsetMinutes)
+        xline(marker.offsetMinutes, '--', 'Color', 'w', 'LineWidth', 0.9);
+    end
 end
 
-xlabel('Time from recording start (min)');
+xlabel('Time (m)');
 ylabel('Frequency (Hz)');
-title(sprintf('Whole-session wavelet power: Session %d', result.session));
+title(sprintf(['Whole-session wavelet power: Session %d ', ...
+    '(solid=stimulus on, dashed=stimulus off)'], ...
+    result.session));
 colorbar;
 colormap(turbo);
 
 imageFile = fullfile(outputDirectory, ...
     sprintf('session_%02d_full_recording.png', result.session));
 exportgraphics(figureHandle, imageFile, 'Resolution', 200);
-close(figureHandle);
+figureFile = fullfile(outputDirectory, ...
+    sprintf('session_%02d_full_recording.fig', result.session));
+savefig(figureHandle, figureFile);
+if ~analysis.showFigures
+    close(figureHandle);
+end
 end
 
 function [timeSeconds, resampledPupil, missingFraction, firstTimestampUS] = ...
@@ -143,23 +156,47 @@ missingFraction = mean(isnan(resampledPupil));
 resampledPupil = fillmissing(resampledPupil, 'linear', 'EndValues', 'nearest');
 end
 
-function onsetMinutes = getStimulusOnsetMinutes(loadedData, firstTimestampUS)
-onsetMinutes = [];
+function stimulusMarkers = getStimulusMarkers(loadedData, firstTimestampUS)
+stimulusMarkers = struct('onsetMinutes', {}, 'offsetMinutes', {}, 'colorRGB', {});
 if ~isfield(loadedData, 'trialLog') || isempty(loadedData.trialLog)
     return;
 end
 
 for iTrial = 1:numel(loadedData.trialLog)
     trial = loadedData.trialLog(iTrial);
+    onsetMinutes = NaN;
+    offsetMinutes = NaN;
     if isfield(trial, 'tobiiSystemOnsetUS') && isfinite(trial.tobiiSystemOnsetUS)
-        onsetMinutes(end + 1, 1) = ...
-            (double(trial.tobiiSystemOnsetUS) - firstTimestampUS) ./ (60 * 1e6); %#ok<AGROW>
+        onsetMinutes = (double(trial.tobiiSystemOnsetUS) - firstTimestampUS) ./ (60 * 1e6);
+        if isfield(trial, 'tobiiSystemOffsetUS') && isfinite(trial.tobiiSystemOffsetUS)
+            offsetMinutes = (double(trial.tobiiSystemOffsetUS) - firstTimestampUS) ./ (60 * 1e6);
+        end
     elseif isfield(trial, 'stimulusOnsetPTB') && isfield(loadedData, 'metadata') && ...
             isfield(loadedData.metadata, 'recordingStartPTB') && ...
             isfinite(loadedData.metadata.recordingStartPTB)
-        onsetMinutes(end + 1, 1) = ...
-            (trial.stimulusOnsetPTB - loadedData.metadata.recordingStartPTB) ./ 60; %#ok<AGROW>
+        onsetMinutes = (trial.stimulusOnsetPTB - loadedData.metadata.recordingStartPTB) ./ 60;
+        if isfield(trial, 'stimulusOffsetPTB') && isfinite(trial.stimulusOffsetPTB)
+            offsetMinutes = (trial.stimulusOffsetPTB - loadedData.metadata.recordingStartPTB) ./ 60;
+        end
     end
+    if isfinite(onsetMinutes)
+        stimulusMarkers(end + 1) = struct( ...
+            'onsetMinutes', onsetMinutes, ...
+            'offsetMinutes', offsetMinutes, ...
+            'colorRGB', getTrialColorRGB(trial)); %#ok<AGROW>
+    end
+end
+end
+
+function colorRGB = getTrialColorRGB(trial)
+if isfield(trial, 'colorRGB')
+    colorRGB = double(trial.colorRGB);
+elseif isfield(trial, 'colourRGB')
+    % Compatibility for files saved before colorRGB was renamed.
+    colorRGB = double(trial.colourRGB);
+else
+    error('AnalyzePupilWavelets:ColorNotFound', ...
+        'trialLog does not contain colorRGB.');
 end
 end
 

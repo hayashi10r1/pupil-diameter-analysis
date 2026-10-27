@@ -63,6 +63,16 @@ cfg.stimuliRGB = [
 ];
 ```
 
+## 単一色・階調実験
+
+`run_single_color_pupil_experiment` は、既存の実験と同じ提示時間・休憩・固視点・記録形式で、1つの色チャンネルを7段階のディジットで提示します。
+
+```matlab
+run_single_color_pupil_experiment
+```
+
+`run_single_color_pupil_experiment.m` の `cfg.singleColorChannel` を `'red'`、`'green'`、`'blue'`、`'gray'` のいずれかに変更して色を選びます。提示ディジットは `cfg.stimulusDigits = [0 25 51 102 153 204 255]` です。各ディジットは1回ずつランダム順に提示されます。
+
 ## 実行
 
 このフォルダをMATLABのカレントフォルダにして実行します。
@@ -149,14 +159,26 @@ export_stimulus_luminance
 analyze_pupil_wavelets
 ```
 
-選択画面で、同じ参加者のセッション1〜3のMATファイルを**3つ同時に選択**してください。刺激ごとには切り出さず、記録開始から終了までを連続した時系列としてCWTにかけます。左右眼が有効な時点では平均瞳孔径を使い、片眼だけ有効な時点ではその値を使います。図中の白い縦線は色刺激の提示開始時刻であり、解析区間を分けるものではありません。
+選択画面で、同じ参加者のセッション1〜3のMATファイルを**3つ同時に選択**してください。刺激ごとには切り出さず、記録開始から終了までを連続した時系列としてCWTにかけます。左右眼が有効な時点では平均瞳孔径を使い、片眼だけ有効な時点ではその値を使います。瞳孔径はZ得点化せず、mmの値のまま解析します。図中の白い実線は色刺激の開始、白い破線は終了時刻を表し、解析区間を分けるものではありません。
 
 出力フォルダには、以下が保存されます。
 
-- 各セッション全体のウェーブレットパワー図
+- 各セッション全体のウェーブレットパワー図（PNGおよび再編集可能なMATLAB FIGファイル）
 - `wavelet_results.mat`：時刻、周波数、パワー、欠損率を含む解析結果
 
-初期設定では、0.1〜4 Hzを解析対象にします。全体時系列の欠損は補間し、その割合が20%を超える場合は警告を表示します。設定は`analyze_pupil_wavelets.m`内の`defaultAnalysisConfig`で変更できます。
+解析後は、各セッションのFIGもMATLAB画面に表示されます。表示を省略したい場合は、`defaultAnalysisConfig`の`analysis.showFigures`を`false`に変更してください。
+
+初期設定では、0.1〜10 Hzを解析対象にします。全体時系列の欠損は補間し、その割合が20%を超える場合は警告を表示します。設定は`analyze_pupil_wavelets.m`内の`defaultAnalysisConfig`で変更できます。
+
+### 刺激ごとの1 Hz帯パワー比較
+
+`compare_stimulus_1hz_power` は、全セッションCWTの`wavelet_results.mat`から、各刺激の提示後5〜35秒・0.8〜1.2 Hzにあるパワーの平均を求めます。RGB刺激ごとの平均、SD、SEMと、セッション別の値を比較できます。
+
+```matlab
+compare_stimulus_1hz_power
+```
+
+出力フォルダには、試行ごとの値、RGBごとの集計表、比較グラフのPNGおよびFIG、MAT形式の結果が保存されます。SpecbosのLUTを用いて、各RGB刺激に対応する輝度（cd/m²）も集計表とグラフの横軸に表示します。
 
 ## 解析時の注意
 
