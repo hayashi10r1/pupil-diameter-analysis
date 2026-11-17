@@ -4,8 +4,9 @@ function outputDirectory = analyze_pupil_wavelets(sessionFiles)
 %
 % Usage:
 %   analyze_pupil_wavelets
+%   analyze_pupil_wavelets('C:\path\to\session1.mat')
 %   analyze_pupil_wavelets({'C:\path\to\session1.mat', ...
-%       'C:\path\to\session2.mat', 'C:\path\to\session3.mat'})
+%       'C:\path\to\session2.mat'})
 %
 % Requires Wavelet Toolbox for cwt().
 
@@ -15,7 +16,7 @@ assert(exist('cwt', 'file') ~= 0, ...
      'found on the current MATLAB path.']);
 
 if nargin < 1 || isempty(sessionFiles)
-    sessionFiles = selectThreeSessionFiles();
+    sessionFiles = selectSessionFiles();
     if isempty(sessionFiles)
         outputDirectory = '';
         return;
@@ -23,8 +24,7 @@ if nargin < 1 || isempty(sessionFiles)
 end
 
 sessionFiles = normalizeFileList(sessionFiles);
-assert(numel(sessionFiles) == analysis.sessionCount, ...
-    'Select exactly %d session MAT files for one participant.', analysis.sessionCount);
+assert(~isempty(sessionFiles), 'Select at least one session MAT file.');
 assert(all(cellfun(@isfile, sessionFiles)), 'One or more session files were not found.');
 
 [firstFolder, firstName] = fileparts(sessionFiles{1});
@@ -32,8 +32,9 @@ outputDirectory = fullfile(firstFolder, sprintf('%s_full_session_wavelets_%s', .
     firstName, datestr(now, 'yyyymmdd_HHMMSS')));
 mkdir(outputDirectory);
 
-sessionResults = cell(analysis.sessionCount, 1);
-for iSession = 1:analysis.sessionCount
+sessionCount = numel(sessionFiles);
+sessionResults = cell(sessionCount, 1);
+for iSession = 1:sessionCount
     loadedData = load(sessionFiles{iSession}, 'gazeData', 'trialLog', 'metadata', 'cfg');
     validateExperimentData(loadedData, sessionFiles{iSession});
     sessionResults{iSession} = analyzeFullSession(loadedData, iSession, analysis);
@@ -47,12 +48,11 @@ waveletResults = struct( ...
 save(fullfile(outputDirectory, 'wavelet_results.mat'), 'waveletResults', '-v7.3');
 
 fprintf('Saved whole-session CWT results for %d sessions to:\n%s\n', ...
-    analysis.sessionCount, outputDirectory);
+    sessionCount, outputDirectory);
 end
 
 function analysis = defaultAnalysisConfig()
 % Change these values when a different frequency band is required.
-analysis.sessionCount = 3;
 analysis.frequencyLimitsHz = [0.1 10.0];
 analysis.warnMissingFraction = 0.20;
 analysis.showFigures = true;
@@ -235,9 +235,9 @@ assert(isfield(loadedData, 'gazeData'), ...
     'The file does not contain gazeData: %s', fileName);
 end
 
-function sessionFiles = selectThreeSessionFiles()
+function sessionFiles = selectSessionFiles()
 [fileNames, folderName] = uigetfile({'*.mat', 'MATLAB data files (*.mat)'}, ...
-    '同じ参加者の3セッション分のMATファイルを選択', pwd, 'MultiSelect', 'on');
+    '解析するセッションMATファイルを選択（1件以上）', pwd, 'MultiSelect', 'on');
 if isequal(fileNames, 0)
     sessionFiles = {};
     return;

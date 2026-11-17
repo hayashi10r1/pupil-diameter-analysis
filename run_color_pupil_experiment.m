@@ -100,7 +100,7 @@ try
         color = cfg.stimuliRGB(trialOrder(iTrial), :);
 
         Screen('FillRect', window, color, windowRect);
-        drawFixationCross(window, windowRect, cfg);
+        drawFixationCross(window, windowRect, cfg, color);
         onset = Screen('Flip', window);
         % `onset` is the Psychtoolbox visual-onset timestamp. Take a
         % Tobii-system-clock marker immediately afterwards so that this
@@ -133,7 +133,8 @@ try
         % Insert a one-minute rest after each completed block of trials,
         % except after the final trial of the experiment.
         % 5トライアルごとに1分間の休憩を入れます（最終試行後を除く）。
-        if mod(iTrial, cfg.breakEveryTrials) == 0 && iTrial < numel(trialOrder)
+        if cfg.breakEveryTrials > 0 && ...
+                mod(iTrial, cfg.breakEveryTrials) == 0 && iTrial < numel(trialOrder)
             runRestBreak(window, cfg, iTrial, numel(trialOrder));
             runPostBreakDarkAdaptation(window, windowRect, cfg);
         end
@@ -307,13 +308,13 @@ cfg.stimuliRGB = [
     204 204 204;  
     255 255 255;
 ];
-cfg.stimulusSeconds = 40.0;                 % Color stimulus duration: 40 s.（色刺激：40秒）
-cfg.interTrialSeconds = 30.0;               % Black screen duration: 30 s.（黒画面：30秒）
-cfg.preRunFixationSeconds = 30.0;           % Initial dark-adaptation period.
+cfg.stimulusSeconds = 5.0;                 % Color stimulus duration: 40 s.（色刺激：40秒）
+cfg.interTrialSeconds = 5.0;               % Black screen duration: 30 s.（黒画面：30秒）
+cfg.preRunFixationSeconds = 5.0;           % Initial dark-adaptation period.
 cfg.breakEveryTrials = 5;                   % Rest after every 5 trials.／5トライアルごとに休憩
-cfg.breakSeconds = 60.0;                    % Rest duration in seconds.／休憩時間（秒）
+cfg.breakSeconds = 5.0;                    % Rest duration in seconds.／休憩時間（秒）
 cfg.backgroundRGB = [0 0 0];                % Inter-trial background (black).
-cfg.fixationCrossRGB = [0 0 0];             % Fixation cross color (black).／固視点の色（黒）
+cfg.fixationCrossRGB = [128 128 128];             % Fixation cross color (black).／固視点の色（黒）
 cfg.fixationCrossHalfLengthPixels = 12;     % Half-length of each cross arm.／十字の各線の半分の長さ
 cfg.fixationCrossLineWidthPixels = 3;       % Cross line width.／十字の線の太さ
 cfg.textFont = 'Yu Gothic UI';               % Japanese-capable Windows font.／日本語対応フォント
@@ -343,10 +344,19 @@ assert(isscalar(cfg.fixationCrossHalfLengthPixels) && cfg.fixationCrossHalfLengt
 assert(isscalar(cfg.fixationCrossLineWidthPixels) && cfg.fixationCrossLineWidthPixels > 0 && ...
     isfinite(cfg.fixationCrossLineWidthPixels), ...
     'fixationCrossLineWidthPixels must be a positive number.');
+if isfield(cfg, 'fixationCrossDigitOffset')
+    assert(isscalar(cfg.fixationCrossDigitOffset) && cfg.fixationCrossDigitOffset >= 0 && ...
+        isfinite(cfg.fixationCrossDigitOffset), ...
+        'fixationCrossDigitOffset must be a non-negative number.');
+    assert(isfield(cfg, 'singleColorChannel') && ...
+        any(strcmpi(char(cfg.singleColorChannel), {'red', 'green', 'blue', 'gray'})), ...
+        ['fixationCrossDigitOffset requires singleColorChannel to be ', ...
+         '''red'', ''green'', ''blue'', or ''gray''.']);
+end
 assert(cfg.stimulusSeconds > 0 && cfg.interTrialSeconds >= 0, 'Durations must be valid.');
-assert(isscalar(cfg.breakEveryTrials) && cfg.breakEveryTrials >= 1 && ...
+assert(isscalar(cfg.breakEveryTrials) && cfg.breakEveryTrials >= 0 && ...
     mod(cfg.breakEveryTrials, 1) == 0, ...
-    'breakEveryTrials must be a positive integer.');
+    'breakEveryTrials must be a non-negative integer (0 disables breaks).');
 assert(isscalar(cfg.breakSeconds) && cfg.breakSeconds >= 0 && isfinite(cfg.breakSeconds), ...
     'breakSeconds must be a non-negative number.');
 assert(ischar(cfg.textFont) || isstring(cfg.textFont), 'textFont must be text.');
@@ -408,14 +418,48 @@ utf8Message = unicode2native(char(message), 'UTF-8');
 DrawFormattedText(window, utf8Message, 'center', 'center', color);
 end
 
-function drawFixationCross(window, windowRect, cfg)
+function drawFixationCross(window, windowRect, cfg, stimulusRGB)
 % Draw a centered fixation cross over the currently prepared background.
 % 現在描画している背景の中央に十字の固視点を重ねて描画します。
+[crossRGB, hasStimulusColor] = deal(cfg.fixationCrossRGB, nargin >= 4);
+if hasStimulusColor && isfield(cfg, 'fixationCrossDigitOffset')
+    crossRGB = offsetSingleColorDigit(stimulusRGB, cfg);
+end
 [xCenter, yCenter] = RectCenter(windowRect);
 halfLength = cfg.fixationCrossHalfLengthPixels;
 coordinates = [xCenter - halfLength, xCenter + halfLength, xCenter, xCenter; ...
                yCenter, yCenter, yCenter - halfLength, yCenter + halfLength];
-Screen('DrawLines', window, coordinates, cfg.fixationCrossLineWidthPixels, cfg.fixationCrossRGB);
+Screen('DrawLines', window, coordinates, cfg.fixationCrossLineWidthPixels, crossRGB);
+end
+
+function crossRGB = offsetSingleColorDigit(stimulusRGB, cfg)
+% Add the offset unless it would exceed 255, in which case subtract it.
+% 加算後に255を超える場合は、代わりに指定量を引きます。
+crossRGB = double(stimulusRGB);
+offset = cfg.fixationCrossDigitOffset;
+if all(crossRGB == 0)
+    % Use the configured dark-screen fixation color for the zero stimulus.
+    % ゼロ階調の刺激では、暗順応時と同じ固視点色を使用します。
+    crossRGB = cfg.fixationCrossRGB;
+    return;
+end
+if strcmpi(char(cfg.singleColorChannel), 'gray')
+    crossRGB = adjustFixationDigit(crossRGB, offset);
+    return;
+end
+
+channelNames = {'red', 'green', 'blue'};
+channelIndex = find(strcmpi(char(cfg.singleColorChannel), channelNames), 1);
+crossRGB(channelIndex) = adjustFixationDigit(crossRGB(channelIndex), offset);
+end
+
+function adjustedDigit = adjustFixationDigit(stimulusDigit, offset)
+% Keep a +/- offset contrast without allowing values outside 0--255.
+% 0--255の範囲内で、刺激との差を指定量だけ保ちます。
+adjustedDigit = stimulusDigit + offset;
+wouldExceedMaximum = adjustedDigit > 255;
+adjustedDigit(wouldExceedMaximum) = max( ...
+    stimulusDigit(wouldExceedMaximum) - offset, 0);
 end
 
 function runRestBreak(window, cfg, completedTrials, totalTrials)

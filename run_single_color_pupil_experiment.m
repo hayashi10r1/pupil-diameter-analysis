@@ -14,8 +14,8 @@ end
 function cfg = singleColorConfig()
 % --- Edit these settings before an experimental session. ---
 % --- 実験セッション前に、この設定を編集してください。 ---
-cfg.participantId = 'test101101';
-cfg.mode = 'test';                           % 'test' or 'production'
+cfg.participantId = 'SR002';
+cfg.mode = 'production';                           % 'test' or 'production'
 cfg.screenNumber = 0;                        % PTB screen ID.
 cfg.skipSyncTests = true;                    % Set false only after sync is verified.
 cfg.sdkRoot = '';                            % Optional Tobii SDK folder.
@@ -30,14 +30,15 @@ cfg.singleColorChannel = 'red';
 cfg.stimulusDigits = [0 25 51 102 153 204 255];
 cfg.stimuliRGB = makeSingleChannelStimuli( ...
     cfg.singleColorChannel, cfg.stimulusDigits);
+cfg.fixationCrossDigitOffset = 30;          % Fixation digit = stimulus digit +/- 30.／固視点は刺激±30
 
-cfg.stimulusSeconds = 40.0;                 % Color stimulus duration: 40 s.／色刺激：40秒
+cfg.stimulusSeconds = 40.0;                 % Color st  imulus duration: 40 s.／色刺激：40秒
 cfg.interTrialSeconds = 30.0;               % Black screen duration: 30 s.／黒画面：30秒
 cfg.preRunFixationSeconds = 30.0;           % Initial dark-adaptation period.／開始前暗順応：30秒
-cfg.breakEveryTrials = 5;                   % Rest after every 5 trials.／5トライアルごとに休憩
-cfg.breakSeconds = 60.0;                    % Rest duration: 60 s.／休憩時間：60秒
+cfg.breakEveryTrials = 0;                   % No rest breaks.／単色実験では休憩なし
+cfg.breakSeconds = 60.0;                     % Used only when breaks are enabled.／休憩を有効にした場合のみ使用
 cfg.backgroundRGB = [0 0 0];
-cfg.fixationCrossRGB = [0 0 0];
+cfg.fixationCrossRGB = [30 30 30];          % Dark-screen and zero-stimulus fixation.／暗順応・ゼロ刺激用
 cfg.fixationCrossHalfLengthPixels = 12;
 cfg.fixationCrossLineWidthPixels = 3;
 cfg.textFont = 'Yu Gothic UI';

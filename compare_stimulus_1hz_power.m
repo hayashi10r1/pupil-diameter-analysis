@@ -1,9 +1,9 @@
 function outputDirectory = compare_stimulus_1hz_power(waveletResultsFile)
-% COMPARE_STIMULUS_1HZ_POWER Compare 1-Hz-band power across stimuli.
-% 全セッションCWTの結果から、各刺激提示後5〜35秒・0.8〜1.2 Hzの
+% 刺激ごとの0.8〜2.0 Hz帯パワーを比較します。
+% 全セッションCWTの結果から、各刺激提示後5〜40秒・0.8〜2.0 Hzの
 % 平均パワーを求め、RGB刺激ごとに比較します。
 %
-% Usage:
+% 使用方法:
 %   compare_stimulus_1hz_power
 %   compare_stimulus_1hz_power('C:\path\to\wavelet_results.mat')
 
@@ -57,12 +57,12 @@ saveComparisonFigure(trialTable, summaryTable, settings, outputDirectory);
 save(fullfile(outputDirectory, 'stimulus_1hz_power_results.mat'), ...
     'settings', 'trialTable', 'summaryTable');
 disp(summaryTable);
-fprintf('Saved 1-Hz power comparison to:\n%s\n', outputDirectory);
+fprintf('Saved 0.8-2.0 Hz power comparison to:\n%s\n', outputDirectory);
 end
 
 function settings = defaultComparisonSettings()
-settings.timeWindowSeconds = [5 35];
-settings.frequencyBandHz = [0.8 1.2];
+settings.timeWindowSeconds = [5 40];
+settings.frequencyBandHz = [0.8 2.0];
 settings.showFigure = true;
 end
 
@@ -85,7 +85,7 @@ assert(size(power, 1) == numel(frequencyHz) && size(power, 2) == numel(timeSecon
     'CWT power dimensions do not match its frequency and time vectors.');
 frequencyMask = frequencyHz >= settings.frequencyBandHz(1) & ...
     frequencyHz <= settings.frequencyBandHz(2);
-assert(any(frequencyMask), 'No CWT frequencies fall within the requested 0.8-1.2 Hz band.');
+assert(any(frequencyMask), 'No CWT frequencies fall within the requested 0.8-2.0 Hz band.');
 
 trialNumber = zeros(numel(sessionData.trialLog), 1);
 redDigit = zeros(numel(sessionData.trialLog), 1);
@@ -120,7 +120,7 @@ sessionColumn = repmat(sessionNumber, numel(trialNumber), 1);
 sessionTrialTable = table(sessionColumn, trialNumber, redDigit, greenDigit, ...
     blueDigit, luminanceCdM2, meanPower, usedSampleCount, ...
     'VariableNames', {'Session', 'Trial', 'RedDigit', 'GreenDigit', ...
-    'BlueDigit', 'Luminance_cd_m2', 'MeanPower_0p8to1p2Hz_5to35s', ...
+    'BlueDigit', 'Luminance_cd_m2', 'MeanPower_0p8to2p0Hz_5to40s', ...
     'UsedPowerSamples'});
 end
 
@@ -140,7 +140,7 @@ luminanceCdM2 = nan(nColors, 1);
 
 for iColor = 1:nColors
     rows = groupIndex == iColor;
-    values = trialTable.MeanPower_0p8to1p2Hz_5to35s(rows);
+    values = trialTable.MeanPower_0p8to2p0Hz_5to40s(rows);
     values = values(isfinite(values));
     redDigit(iColor) = trialTable.RedDigit(find(rows, 1, 'first'));
     greenDigit(iColor) = trialTable.GreenDigit(find(rows, 1, 'first'));
@@ -156,21 +156,16 @@ end
 summaryTable = table(redDigit, greenDigit, blueDigit, luminanceCdM2, nObservations, ...
     meanPower, standardDeviation, standardError, ...
     'VariableNames', {'RedDigit', 'GreenDigit', 'BlueDigit', ...
-    'Luminance_cd_m2', 'N', 'MeanPower_0p8to1p2Hz_5to35s', 'SD', 'SEM'});
-summaryTable = sortColors(summaryTable);
+    'Luminance_cd_m2', 'N', 'MeanPower_0p8to2p0Hz_5to40s', 'SD', 'SEM'});
+summaryTable = sortByLuminance(summaryTable);
 end
 
-function sortedTable = sortColors(summaryTable)
-% Order primary colors by hue, then dark-to-light within each color.
-% 赤、緑、青、グレースケールの順に並べ、各色内では暗い順にします。
+function sortedTable = sortByLuminance(summaryTable)
+% 輝度の昇順に並べます。対応するLUT値がない刺激は最後に配置します。
 rgb = [summaryTable.RedDigit, summaryTable.GreenDigit, summaryTable.BlueDigit];
-colorGroup = 5 * ones(height(summaryTable), 1);
-colorGroup(rgb(:, 1) > 0 & rgb(:, 2) == 0 & rgb(:, 3) == 0) = 1;
-colorGroup(rgb(:, 1) == 0 & rgb(:, 2) > 0 & rgb(:, 3) == 0) = 2;
-colorGroup(rgb(:, 1) == 0 & rgb(:, 2) == 0 & rgb(:, 3) > 0) = 3;
-colorGroup(rgb(:, 1) == rgb(:, 2) & rgb(:, 2) == rgb(:, 3)) = 4;
-intensity = max(rgb, [], 2);
-[~, order] = sortrows([colorGroup, intensity, rgb], [1 2 3 4 5]);
+luminanceForSort = summaryTable.Luminance_cd_m2;
+luminanceForSort(~isfinite(luminanceForSort)) = Inf;
+[~, order] = sortrows([luminanceForSort, rgb], [1 2 3 4]);
 sortedTable = summaryTable(order, :);
 end
 
@@ -184,10 +179,9 @@ figureHandle = figure('Color', 'w', 'Visible', visibility, ...
     'Position', [100 100 1800 750]);
 nColors = height(summaryTable);
 x = 1:nColors;
-barHandle = bar(x, summaryTable.MeanPower_0p8to1p2Hz_5to35s, ...
-    'FaceColor', 'flat', 'EdgeColor', [0.1 0.1 0.1], 'LineWidth', 1.2);
-barHandle.CData = [summaryTable.RedDigit, summaryTable.GreenDigit, ...
-    summaryTable.BlueDigit] ./ 255;
+barHandle = bar(x, summaryTable.MeanPower_0p8to2p0Hz_5to40s, ...
+    'FaceColor', [0.72 0.72 0.72], 'EdgeColor', [0.1 0.1 0.1], ...
+    'LineWidth', 1.2);
 hold on;
 
 colorLabels = compose('%.1f cd/m^2', summaryTable.Luminance_cd_m2);
@@ -195,7 +189,7 @@ for iColor = 1:nColors
     rows = trialTable.RedDigit == summaryTable.RedDigit(iColor) & ...
         trialTable.GreenDigit == summaryTable.GreenDigit(iColor) & ...
         trialTable.BlueDigit == summaryTable.BlueDigit(iColor);
-    values = trialTable.MeanPower_0p8to1p2Hz_5to35s(rows);
+    values = trialTable.MeanPower_0p8to2p0Hz_5to40s(rows);
     if numel(values) == 1
         offsets = 0;
     else
@@ -211,8 +205,8 @@ xticks(x);
 xticklabels(colorLabels);
 xtickangle(45);
 xlabel('Stimulus luminance (cd/m^2)');
-ylabel('Mean CWT power (0.8-1.2 Hz, 5-35 s)');
-title('Comparison of 1-Hz-band pupil power by stimulus');
+ylabel('Mean CWT power (0.8-2.0 Hz, 5-40 s)');
+title('Comparison of 0.8-2.0 Hz pupil power by stimulus');
 
 pngFile = fullfile(outputDirectory, 'stimulus_1hz_power_comparison.png');
 figFile = fullfile(outputDirectory, 'stimulus_1hz_power_comparison.fig');
@@ -227,7 +221,7 @@ function colorRGB = getTrialColorRGB(trial)
 if isfield(trial, 'colorRGB')
     colorRGB = double(trial.colorRGB);
 elseif isfield(trial, 'colourRGB')
-    % Compatibility for files saved before colorRGB was renamed.
+    % colorRGBへの名称変更前に保存したデータとの互換処理です。
     colorRGB = double(trial.colourRGB);
 else
     error('CompareStimulus1HzPower:ColorNotFound', ...
@@ -244,7 +238,7 @@ end
 end
 
 function luminanceLUT = loadLuminanceLUT()
-% Load the Specbos RGB-to-luminance lookup table stored with this project.
+% プロジェクト内のSpecbos RGB-輝度対応表を読み込みます。
 projectFolder = fileparts(mfilename('fullpath'));
 calibrationFiles = dir(fullfile(projectFolder, 'SpecbosData-*.mat'));
 assert(numel(calibrationFiles) == 1, ...
