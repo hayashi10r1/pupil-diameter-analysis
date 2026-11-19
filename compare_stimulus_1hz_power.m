@@ -53,6 +53,7 @@ summaryTable = summarizeByColor(trialTable);
 writetable(trialTable, fullfile(outputDirectory, 'stimulus_1hz_power_by_trial.csv'));
 writetable(summaryTable, fullfile(outputDirectory, 'stimulus_1hz_power_by_color.csv'));
 saveComparisonFigure(trialTable, summaryTable, settings, outputDirectory);
+saveVarianceFigure(summaryTable, settings, outputDirectory);
 
 save(fullfile(outputDirectory, 'stimulus_1hz_power_results.mat'), ...
     'settings', 'trialTable', 'summaryTable');
@@ -134,6 +135,7 @@ greenDigit = zeros(nColors, 1);
 blueDigit = zeros(nColors, 1);
 nObservations = zeros(nColors, 1);
 meanPower = nan(nColors, 1);
+variancePower = nan(nColors, 1);
 standardDeviation = nan(nColors, 1);
 standardError = nan(nColors, 1);
 luminanceCdM2 = nan(nColors, 1);
@@ -149,14 +151,15 @@ for iColor = 1:nColors
     luminanceCdM2(iColor) = mean(luminanceValues, 'omitnan');
     nObservations(iColor) = numel(values);
     meanPower(iColor) = mean(values, 'omitnan');
+    variancePower(iColor) = var(values, 0, 'omitnan');
     standardDeviation(iColor) = std(values, 'omitnan');
     standardError(iColor) = standardDeviation(iColor) ./ sqrt(nObservations(iColor));
 end
 
 summaryTable = table(redDigit, greenDigit, blueDigit, luminanceCdM2, nObservations, ...
-    meanPower, standardDeviation, standardError, ...
+    meanPower, variancePower, standardDeviation, standardError, ...
     'VariableNames', {'RedDigit', 'GreenDigit', 'BlueDigit', ...
-    'Luminance_cd_m2', 'N', 'MeanPower_0p8to2p0Hz_5to40s', 'SD', 'SEM'});
+    'Luminance_cd_m2', 'N', 'MeanPower_0p8to2p0Hz_5to40s', 'Variance', 'SD', 'SEM'});
 summaryTable = sortByLuminance(summaryTable);
 end
 
@@ -212,6 +215,36 @@ pngFile = fullfile(outputDirectory, 'stimulus_1hz_power_comparison.png');
 figFile = fullfile(outputDirectory, 'stimulus_1hz_power_comparison.fig');
 exportgraphics(figureHandle, pngFile, 'Resolution', 200);
 savefig(figureHandle, figFile);
+if ~settings.showFigure
+    close(figureHandle);
+end
+end
+
+function saveVarianceFigure(summaryTable, settings, outputDirectory)
+% 刺激ごとの平均パワーの分散を、平均パワー図と同じ順序で出力します。
+if settings.showFigure
+    visibility = 'on';
+else
+    visibility = 'off';
+end
+figureHandle = figure('Color', 'w', 'Visible', visibility, ...
+    'Position', [100 100 1800 750]);
+nColors = height(summaryTable);
+x = 1:nColors;
+bar(x, summaryTable.Variance, 'FaceColor', [0.72 0.72 0.72], ...
+    'EdgeColor', [0.1 0.1 0.1], 'LineWidth', 1.2);
+grid on;
+xlim([0.4 nColors + 0.6]);
+xticks(x);
+xticklabels(compose('%.1f cd/m^2', summaryTable.Luminance_cd_m2));
+xtickangle(45);
+xlabel('Stimulus luminance (cd/m^2)');
+ylabel('Variance of mean CWT power (0.8-2.0 Hz, 5-40 s)');
+title('Variance of pupil power by stimulus');
+exportgraphics(figureHandle, fullfile(outputDirectory, ...
+    'stimulus_1hz_power_variance_comparison.png'), 'Resolution', 200);
+savefig(figureHandle, fullfile(outputDirectory, ...
+    'stimulus_1hz_power_variance_comparison.fig'));
 if ~settings.showFigure
     close(figureHandle);
 end

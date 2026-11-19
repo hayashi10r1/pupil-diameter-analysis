@@ -172,13 +172,13 @@ analyze_pupil_wavelets
 
 ### 刺激ごとの1 Hz帯パワー比較
 
-`compare_stimulus_1hz_power` は、全セッションCWTの`wavelet_results.mat`から、各刺激の提示後5〜40秒・0.8〜2.0 Hzにあるパワーの平均を求めます。RGB刺激ごとの平均、SD、SEMと、セッション別の値を比較できます。
+`compare_stimulus_1hz_power` は、全セッションCWTの`wavelet_results.mat`から、各刺激の提示後5〜40秒・0.8〜2.0 Hzにあるパワーの平均を求めます。RGB刺激ごとの平均、分散、SD、SEMと、セッション別の値を比較できます。
 
 ```matlab
 compare_stimulus_1hz_power
 ```
 
-出力フォルダには、試行ごとの値、RGBごとの集計表、比較グラフのPNGおよびFIG、MAT形式の結果が保存されます。SpecbosのLUTを用いて、各RGB刺激に対応する輝度（cd/m²）も集計表とグラフの横軸に表示します。
+出力フォルダには、試行ごとの値、RGBごとの集計表、平均パワー図と分散図のPNGおよびFIG、MAT形式の結果が保存されます。SpecbosのLUTを用いて、各RGB刺激に対応する輝度（cd/m²）も集計表とグラフの横軸に表示します。
 
 ### 刺激ごとの平均瞳孔径比較
 
